@@ -6,10 +6,10 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from collections import deque
 
-# Paramètres du jeu
+# Game parameters
 GRID_SIZE = 4
 STATE_SIZE = GRID_SIZE * GRID_SIZE   # 16
-ACTION_SIZE = 4                      # 0: haut, 1: bas, 2: gauche, 3: droite
+ACTION_SIZE = 4                      # 0: up, 1: down, 2: left, 3: right
 GAMMA = 0.9
 LEARNING_RATE = 0.01
 EPSILON = 1.0
@@ -20,15 +20,15 @@ MEMORY_SIZE = 2000
 EPISODES = 1000
 TARGET_UPDATE_FREQ = 10
 
-# Déplacements possibles
+# Possible moves
 MOVES = {
-    0: (-1, 0),   # Haut
-    1: (1, 0),    # Bas
-    2: (0, -1),   # Gauche
-    3: (0, 1)     # Droite
+    0: (-1, 0),   # Up
+    1: (1, 0),    # Down
+    2: (0, -1),   # Left
+    3: (0, 1)     # Right
 }
 
-# ---------- Environnement GridWorld avec retour one-hot ----------
+# ---------- GridWorld environment with one-hot return ----------
 class GridWorld:
     def __init__(self, size=GRID_SIZE, start=(0, 0), goal=(3, 3), obstacle=(1, 1)):
         self.size = size
@@ -38,19 +38,19 @@ class GridWorld:
         self.state = None
 
     def reset(self):
-        """Réinitialise l'environnement et retourne l'état one-hot."""
+        """Reset the environment and return the one-hot state."""
         self.state = self.start
         return self._state_to_onehot(self.state)
 
     def step(self, action):
-        """Exécute l'action, retourne (next_state_onehot, reward, done)."""
+        """Execute the action, return (next_state_onehot, reward, done)."""
         row, col = self.state
         dr, dc = MOVES[action]
         new_row, new_col = row + dr, col + dc
 
-        # Vérifier les limites de la grille
+        # Check grid boundaries
         if not (0 <= new_row < self.size and 0 <= new_col < self.size):
-            # L'action est invalide : on reste sur place et on pénalise
+            # Invalid action: stay in place and penalize
             new_row, new_col = row, col
             reward = -0.1
             done = False
@@ -72,13 +72,13 @@ class GridWorld:
         return self._state_to_onehot(self.state), reward, done
 
     def _state_to_onehot(self, pos):
-        """Convertit une position (ligne, colonne) en vecteur one-hot de taille 16."""
+        """Convert a position (row, column) into a one‑hot vector of size 16."""
         idx = pos[0] * self.size + pos[1]
         one_hot = np.zeros(self.size * self.size, dtype=np.float32)
         one_hot[idx] = 1.0
         return one_hot
 
-# ---------- Agent Double DQN ----------
+# ---------- Double DQN Agent ----------
 class DoubleDQNAgent:
     def __init__(self, state_size, action_size, gamma, learning_rate,
                  epsilon, epsilon_min, epsilon_decay, batch_size, memory_size,
@@ -99,7 +99,7 @@ class DoubleDQNAgent:
         self._update_target()
 
     def _build_model(self):
-        """Construit le réseau de neurones (2 couches cachées de 24 neurones)."""
+        """Build the neural network (two hidden layers of 24 neurons each)."""
         model = Sequential([
             Dense(24, activation='relu', input_shape=(self.state_size,)),
             Dense(24, activation='relu'),
@@ -109,22 +109,22 @@ class DoubleDQNAgent:
         return model
 
     def _update_target(self):
-        """Copie les poids du réseau principal vers le réseau cible."""
+        """Copy weights from the main network to the target network."""
         self.target_model.set_weights(self.model.get_weights())
 
     def remember(self, state, action, reward, next_state, done):
-        """Stocke une expérience dans la mémoire."""
+        """Store an experience in memory."""
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
-        """Sélectionne une action avec la politique ε-greedy."""
+        """Select an action using the ε‑greedy policy."""
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         q_values = self.model.predict(np.array([state]), verbose=0)[0]
         return np.argmax(q_values)
 
     def replay(self):
-        """Entraîne le modèle sur un batch d'expériences (Double DQN)."""
+        """Train the model on a batch of experiences (Double DQN)."""
         if len(self.memory) < self.batch_size:
             return
 
@@ -133,25 +133,25 @@ class DoubleDQNAgent:
             if done:
                 target = reward
             else:
-                # Sélection de la meilleure action avec le réseau principal
+                # Select the best action using the main network
                 q_next = self.model.predict(np.array([next_state]), verbose=0)[0]
                 best_action = np.argmax(q_next)
-                # Évaluation avec le réseau cible
+                # Evaluate it with the target network
                 target_q_next = self.target_model.predict(np.array([next_state]), verbose=0)[0][best_action]
                 target = reward + self.gamma * target_q_next
 
-            # Récupération des Q-valeurs actuelles
+            # Retrieve current Q‑values
             q_values = self.model.predict(np.array([state]), verbose=0)[0]
             q_values[action] = target
 
-            # Mise à jour sur un exemple
+            # Update on a single example
             self.model.fit(np.array([state]), np.array([q_values]), epochs=1, verbose=0)
 
-        # Décroissance d'epsilon
+        # Decay epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
-        # Mise à jour périodique du réseau cible
+        # Periodically update the target network
         self.step_counter += 1
         if self.step_counter % self.target_update_freq == 0:
             self._update_target()
@@ -159,7 +159,7 @@ class DoubleDQNAgent:
     def save(self, filename):
         self.model.save(filename)
 
-# ---------- Entraînement ----------
+# ---------- Training ----------
 if __name__ == "__main__":
     env = GridWorld()
     agent = DoubleDQNAgent(
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     for episode in range(EPISODES):
         state = env.reset()
         total_reward = 0
-        for step in range(50):  # limite de 50 pas
+        for step in range(50):  # limit of 50 steps
             action = agent.act(state)
             next_state, reward, done = env.step(action)
             agent.remember(state, action, reward, next_state, done)
@@ -194,9 +194,9 @@ if __name__ == "__main__":
 
         if (episode + 1) % 10 == 0:
             avg_reward = np.mean(episode_rewards[-10:])
-            print(f"Épisode {episode+1}/{EPISODES}, "
-                  f"Score moyen (10 derniers): {avg_reward:.2f}, "
+            print(f"Episode {episode+1}/{EPISODES}, "
+                  f"Average score (last 10): {avg_reward:.2f}, "
                   f"Epsilon: {agent.epsilon:.4f}")
 
     agent.save("double_dqn_model.keras")
-    print("Entraînement terminé. Modèle sauvegardé.")
+    print("Training finished. Model saved.")
